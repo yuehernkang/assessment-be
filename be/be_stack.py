@@ -102,39 +102,3 @@ class BeStack(Stack):
             integration=inventory_default_integration,
             # authorizer=route_options
         )
-
-        # Use default VPC
-        vpc = ec2.Vpc.from_lookup(self, "DefaultVPC", is_default=True)
-
-        # Create ECS Cluster
-        cluster = ecs.Cluster(self, "MeiliCluster", vpc=vpc)
-
-        # Define security group to allow port 7700
-        sg = ec2.SecurityGroup(
-            self, "MeiliSG", vpc=vpc,
-            description="Allow access to Meilisearch",
-            allow_all_outbound=True,
-        )
-        sg.add_ingress_rule(
-            peer=ec2.Peer.any_ipv4(),
-            connection=ec2.Port.tcp(7700),
-            description="Allow Meilisearch HTTP access",
-        )
-        repo = ecr.Repository(self, "MeiliEcrRepo", repository_name="meilisearch-init")
-        container_image = ecs.ContainerImage.from_ecr_repository(repo, tag="latest")
-        task_def = ecs.FargateTaskDefinition(self, "MeiliTaskDef")
-        container = task_def.add_container(
-            "MeiliContainer",
-            image=container_image,
-            environment={"MEILI_MASTER_KEY": "MASTER_KEY"},
-            logging=ecs.LogDrivers.aws_logs(stream_prefix="meili"),
-        )
-        container.add_port_mappings(ecs.PortMapping(container_port=7700))
-        ecs.FargateService(self, "MeiliService",
-            cluster=cluster,
-            task_definition=task_def,
-            security_groups=[sg],
-            assign_public_ip=True,
-            desired_count=1
-        )
-
